@@ -16,21 +16,23 @@ into structured, *verified* information:
 Sudan doesn't have just one plate format. The General Directorate of Traffic
 issues a whole family of them, distinguished by colour and by a class marker:
 
-    private    (silver)   7 KH 10346     digit + state letters + serial
-    government (yellow)   GOV 00000      "GOV" marker
-    army       (red)      ARMY 00000     "ARMY" marker
-    police     (blue)     POLICE 00000   "POLICE" marker
-    UN         (blue/red) UN 00          "U.N" marker
-    diplomatic (red)      CD 00          "C.D" — Corps Diplomatique
-    consular   (green)    HC 00          "H.C" — consular corps
-    national NGO (yellow) NGO 0000       "N.G.O" marker
-    int. org.  (white)    IO 0000        "I.O" marker
-    red crescent (white)  ...            Sudanese Red Crescent
-    transit    (silver)   TRANSIT        "TRANSIT" marker
-    temporary  (silver)   مؤقتة          "TEMP" marker
+    private     (silver)  7 KH 10346     digit + state letters + serial
+    government  (yellow)  GOV 00000      "GOV" — حكومة
+    army        (red)     ARMY 00000     "ARMY" — القوات المسلحة
+    police      (blue)    POLICE 00000   "POLICE" — الشرطة
+    UN          (red/blu) UN 00          "U.N" — الأمم المتحدة
+    diplomatic  (red)     CD 00          "C.D" — هيئات دبلوماسية
+    consular    (green)   HC 00          "H.C" — هيئات قنصلية
+    NGO         (yellow)  NGO 0000       "N.G.O" — منظمة غير حكومية
+    int. orgs   (white)   IO 0000        "I.O" — منظمات دولية
+    red crescent(white)   ...            الهلال الأحمر السوداني
+    limousine   (silver)  ليموزين         Arabic-only
+    investment  (grn/blk) استثمار + KH9   commercial; carries a state code
+    transit     (silver)  TRANSIT        عبور
+    temporary   (white)   مؤقتة / سريع / داخلي
 
 The class list mirrors the General Directorate of Traffic reference board in
-docs/plate_types_reference.png — verified, not assumed.
+docs/plate_types_reference.png — every Arabic name transcribed off the board.
 
 This interpreter recognises all of them. The colour of the plate crop (if the
 caller passes it) is used as corroborating evidence, never as the sole signal —
@@ -120,14 +122,14 @@ PLATE_CLASSES: tuple[PlateClass, ...] = (
                ("POLICE",), ("الشرطة",), ("white", "blue")),
     PlateClass("un", "United Nations", "الأمم المتحدة",
                ("UN",), ("الأمم المتحدة",), ("red", "blue")),
-    PlateClass("diplomat", "Diplomatic Corps", "السلك الدبلوماسي",
-               ("CD",), ("السلك الدبلوماسي",), ("red",)),
-    PlateClass("consular", "Consular Corps", "السلك القنصلي",
-               ("HC",), ("السلك القنصلي",), ("green",)),
-    PlateClass("ngo", "National NGO", "منظمة وطنية",
-               ("NGO",), ("منظمة وطنية",), ("yellow",)),
-    PlateClass("int_org", "International Organization", "منظمة دولية",
-               ("IO",), ("منظمة دولية",), ("white",)),
+    PlateClass("diplomat", "Diplomatic Missions", "هيئات دبلوماسية",
+               ("CD",), ("هيئات دبلوماسية", "دبلوماسية"), ("red",)),
+    PlateClass("consular", "Consular Missions", "هيئات قنصلية",
+               ("HC",), ("هيئات قنصلية", "قنصلية"), ("green",)),
+    PlateClass("ngo", "NGO", "منظمة غير حكومية",
+               ("NGO",), ("منظمة غير حكومية", "غير حكومية"), ("yellow",)),
+    PlateClass("int_org", "International Organizations", "منظمات دولية",
+               ("IO",), ("منظمات دولية",), ("white",)),
     PlateClass("red_crescent", "Sudanese Red Crescent", "الهلال الأحمر السوداني",
                ("REDCRESCENT", "HILAL"), ("الهلال الأحمر",), ("white", "red")),
     PlateClass("limousine", "Limousine", "ليموزين",

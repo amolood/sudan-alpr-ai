@@ -165,11 +165,11 @@ entry transcribed straight off the board, plate by plate:
 | Armed Forces | `ARMY` | القوات المسلحة | red |
 | Police | `POLICE` | الشرطة | white / blue |
 | United Nations | `U.N` | الأمم المتحدة | red & blue variants |
-| Diplomatic Corps | `C.D` | السلك الدبلوماسي | red |
-| Consular Corps | `H.C` | السلك القنصلي | green |
-| National NGO | `N.G.O` | منظمة وطنية | yellow |
-| International Org. | `I.O` | منظمة دولية | white |
-| Sudanese Red Crescent | — | الهلال الأحمر | white |
+| Diplomatic Missions | `C.D` | هيئات دبلوماسية | red |
+| Consular Missions | `H.C` | هيئات قنصلية | green |
+| NGO | `N.G.O` | منظمة غير حكومية | yellow |
+| International Organizations | `I.O` | منظمات دولية | white |
+| Sudanese Red Crescent | — | الهلال الأحمر السوداني | white |
 | Limousine | — | ليموزين | silver |
 | Investment / Commercial | — | استثمار | green / black |
 | Transit | `TRANSIT` | عبور | silver |
