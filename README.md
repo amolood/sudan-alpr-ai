@@ -15,6 +15,18 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/amolood/sudan-alpr-ai/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/amolood/sudan-alpr-ai?style=social"></a>
+  <a href="https://github.com/amolood/sudan-alpr-ai/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/amolood/sudan-alpr-ai?style=social"></a>
+  <a href="https://github.com/amolood/sudan-alpr-ai/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/amolood/sudan-alpr-ai"></a>
+  <a href="https://github.com/amolood/sudan-alpr-ai/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/amolood/sudan-alpr-ai"></a>
+  <a href="https://github.com/amolood/sudan-alpr-ai/issues"><img alt="Issues" src="https://img.shields.io/github/issues/amolood/sudan-alpr-ai"></a>
+</p>
+
+<p align="center">
+  <em>⭐ If this is useful to you, a star helps others find it.</em>
+</p>
+
+<p align="center">
   <img src="docs/demo_plate.png" alt="A real Sudanese plate detected and read as 2G479 (Gezira)" width="520">
   <br>
   <em>A real plate, detected and read: <code>2G479</code> → Sudan / Gezira</em>
@@ -35,6 +47,7 @@ photo. This one holds up on messy, real-world shots.
 - [Country, class & state recognition](#country-class-and-state-recognition)
 - [Accuracy & benchmark](#benchmark) · [Tests](#tests)
 - [Honest caveats](#honest-caveats) · [Training](training/README.md)
+- [Contributors](#contributors) · [License](#license)
 
 ---
 
@@ -494,3 +507,35 @@ before every change.
 | Angled real photos | usually failed | handles them fine |
 | Setup | needs MATLAB | free Python |
 | Accuracy | limited | high |
+
+---
+
+## Contributors
+
+Thanks to everyone who has helped improve this project 💚
+
+<a href="https://github.com/amolood/sudan-alpr-ai/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=amolood/sudan-alpr-ai" alt="Contributors" />
+</a>
+
+| Contributor | Role |
+|---|---|
+| [@amolood](https://github.com/amolood) | Author & maintainer — pipeline, interpreter, benchmark, training |
+| [@mhamidawad](https://github.com/mhamidawad) | Training script hardening — WandB tracking, checkpoint resume, pre-flight checks |
+
+Contributions are welcome — open an issue or a pull request. Good first areas:
+adding verified state codes, gathering labeled plates for training, or reading
+the Arabic line directly.
+
+## Acknowledgements
+
+- [FastALPR](https://github.com/ankandrew/fast-alpr) — the detector + OCR engine this builds on.
+- The official Sudan General Directorate of Traffic plate-types board, used to verify every plate class.
+
+## License
+
+Released under the [MIT License](LICENSE) — free to use, learn from, and build on.
+
+<p align="center">
+  <sub>Built for educational purposes · 🇸🇩</sub>
+</p>
