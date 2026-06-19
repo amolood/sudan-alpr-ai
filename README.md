@@ -113,28 +113,62 @@ Drop your photos in `input/`, point the script at it, done.
 
 ## Output
 
-In the terminal you get the plate text plus country, state, and confidence:
+In the terminal you get the plate text plus country, class/state, and
+confidence. Private plates show their state; special plates show their class:
 
 ```
 📷 my_car.jpg
-    🔖 3KH3476     🇸🇩 Sudan / Khartoum     (country 95% | detect 90%)
+    🔖 3KH3476      🇸🇩 Sudan / Khartoum         (country 95% | detect 90%)
+    🔖 POLICE00000  🇸🇩 Sudan / Police           (country 97% | detect 88%)
 ```
 
 And in `output/`:
 
 - `annotated_<image>` — the original photo with a box drawn around the plate
-  and the reading (plus `KH/Sudan`) written above it.
-- `results.json` — everything in JSON: text, country, state, confidence scores,
-  and the plate's bounding box.
+  and the reading (plus `KH/Sudan` or the class) written above it.
+- `results.json` — everything in JSON: text, country, plate class, state,
+  confidence scores, and the plate's bounding box.
 
-## Country and state recognition
+## Country, class, and state recognition
 
 Once the text is read, it passes through the Sudanese plate interpreter in
-[`sudan_plate.py`](sudan_plate.py), which answers two questions:
+[`sudan_plate.py`](sudan_plate.py), which answers three things:
 
 - **Is this a Sudanese plate?** Yes/no, with a confidence score.
-- **Which state (wilaya)?** It decodes the state letters into a name, in both
-  English and Arabic.
+- **What class of plate is it?** Private, government, police, army, diplomatic,
+  UN, NGO, transit, temporary… (see below).
+- **Which state (wilaya)?** For private plates, it decodes the state letters
+  into a name, in both English and Arabic.
+
+### Plate classes
+
+Sudan doesn't issue one plate format — the General Directorate of Traffic uses
+a whole family, told apart by colour and a text marker. The interpreter knows
+all of them:
+
+| Class | Marker | Typical colour | Arabic |
+|---|---|---|---|
+| Private | `<digit><state><serial>` | silver / white | خصوصي |
+| Government | `GOV` | yellow | حكومي |
+| Police | `POLICE` | red / blue | الشرطة |
+| Armed Forces | `ARMY` | red | القوات المسلحة |
+| Diplomatic | `CD` | red | دبلوماسي |
+| United Nations | `UN` | blue | الأمم المتحدة |
+| NGO | `NGO` | yellow | منظمة طوعية |
+| High Committee | `HC` | green | اللجنة العليا |
+| Limousine / Taxi | `LIMO` / `TAXI` | yellow | ليموزين / أجرة |
+| Transit | `TRANSIT` | silver | عبور |
+| Temporary | `TEMP` | silver | مؤقتة |
+| Red Crescent | `HILAL` | red | الهلال الأحمر |
+
+The **text marker decides the class** — so it still works on a greyscale or
+badly-lit photo. If the caller also measures the plate's **colour** (the
+column-split reader does, via `dominant_plate_color`), that colour is used as
+*corroboration* and nudges the confidence up, but it's never the sole signal.
+
+So a `POLICE 00000` plate reads as Police, an `ARMY 00000` as Armed Forces, a
+`GOV 00000` as Government — and a normal `7KH10346` stays Private with its state
+decoded to Khartoum.
 
 ### Why structure, not guessing
 

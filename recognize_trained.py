@@ -74,6 +74,8 @@ def main() -> int:
             plates.append({"text": info.text,
                            "country": info.country,
                            "country_confidence": info.country_confidence,
+                           "plate_class": info.plate_class,
+                           "plate_class_en": info.plate_class_en,
                            "state": info.state,
                            "state_code": info.state_code,
                            "is_sudan": info.is_sudan,
@@ -83,8 +85,15 @@ def main() -> int:
         print(f"\n📷 {os.path.basename(img_path)}")
         for p in plates:
             flag = "🇸🇩" if p["is_sudan"] else "🌐"
-            loc = f"{p['country']}" + (f" / {p['state']}" if p["is_sudan"] else "")
-            print(f"    🔖 {p['text']:<12} {flag} {loc:<22} "
+            # For private plates show the state; for special classes show the
+            # class (police/army/…) instead, since they have no state.
+            if p["is_sudan"] and p["plate_class"] == "private":
+                loc = f"{p['country']} / {p['state']}"
+            elif p["is_sudan"]:
+                loc = f"{p['country']} / {p['plate_class_en']}"
+            else:
+                loc = p["country"]
+            print(f"    🔖 {p['text']:<12} {flag} {loc:<26} "
                   f"(country {p['country_confidence']*100:.0f}% | detect {p['detect_conf']*100:.0f}%)")
         if not plates:
             print("    — no plate detected")

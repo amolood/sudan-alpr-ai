@@ -80,6 +80,49 @@ def _ocr_text(ocr_engine, crop, cv2, scale: int = 4) -> str:
     return (res.text or "") if res else ""
 
 
+def dominant_plate_color(plate_bgr) -> str:
+    """Roughly classify a plate's background colour.
+
+    Sudanese plate *class* tracks colour (red=army/police, yellow=government,
+    green=commercial, silver/white=private…). We don't need precision — just a
+    coarse hint the interpreter can use to corroborate the text marker. Returns
+    one of: red, yellow, green, blue, silver, white, or "" if unsure.
+
+    We look at the plate's border region (the centre is mostly characters), in
+    HSV, and pick the colour whose hue/saturation band dominates.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except Exception:
+        return ""
+    if plate_bgr is None or plate_bgr.size == 0:
+        return ""
+
+    hsv = cv2.cvtColor(plate_bgr, cv2.COLOR_BGR2HSV)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    sat_mean = float(s.mean())
+
+    # Low saturation -> greyscale plate: silver vs white by brightness.
+    if sat_mean < 45:
+        return "white" if float(v.mean()) > 170 else "silver"
+
+    # Otherwise classify by hue among the saturated pixels.
+    mask = s > 60
+    if mask.sum() < 0.05 * s.size:
+        return "silver"
+    hue = h[mask]
+    # OpenCV hue is 0–179. Count pixels per colour band.
+    bands = {
+        "red":    int(((hue < 10) | (hue > 160)).sum()),
+        "yellow": int(((hue >= 18) & (hue < 38)).sum()),
+        "green":  int(((hue >= 38) & (hue < 85)).sum()),
+        "blue":   int(((hue >= 90) & (hue < 130)).sum()),
+    }
+    best = max(bands, key=bands.get)
+    return best if bands[best] > 0.15 * hue.size else "silver"
+
+
 def read_sudan_plate(plate_bgr, ocr_engine, cv2):
     """
     Read a cropped Sudanese plate using its KNOWN two-column layout instead of
@@ -174,14 +217,19 @@ def main() -> int:
             # Stage 2: read using the Sudanese two-column layout.
             text, info = read_sudan_plate(plate_bgr, alpr.ocr, cv2)
 
-            # Stage 3: verify country + recognise the state (wilaya) from text.
-            plate = interpret(text)
+            # Stage 3: verify country, plate class, and state from the text,
+            # using the plate's dominant colour as corroborating evidence.
+            color = dominant_plate_color(plate_bgr)
+            plate = interpret(text, color=color)
 
             plates.append({
                 "text": plate.text,
                 "country": plate.country,
                 "country_confidence": plate.country_confidence,
                 "is_sudan": plate.is_sudan,
+                "plate_class": plate.plate_class,
+                "plate_class_en": plate.plate_class_en,
+                "color": plate.color,
                 "state": plate.state,
                 "state_code": plate.state_code,
                 "serial": plate.serial or info["serial"],
@@ -189,11 +237,13 @@ def main() -> int:
                 "box": [x1, y1, x2, y2],
             })
 
-            # draw box + recognised text (with country/state when Sudanese)
+            # draw box + recognised text (with class/state when Sudanese)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 0), 2)
             label = text if text else "?"
-            if plate.is_sudan:
+            if plate.is_sudan and plate.plate_class == "private":
                 label = f"{label}  {plate.state_code}/Sudan"
+            elif plate.is_sudan:
+                label = f"{label}  {plate.plate_class_en}/Sudan"
             cv2.putText(annotated, label, (x1, max(0, y1 - 8)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
 
@@ -206,8 +256,13 @@ def main() -> int:
         if plates:
             for p in plates:
                 flag = "🇸🇩" if p["is_sudan"] else "🌐"
-                loc = p["country"] + (f" / {p['state']}" if p["is_sudan"] else "")
-                print(f"    🔖 {p['text']:<12} {flag} {loc:<22} "
+                if p["is_sudan"] and p["plate_class"] == "private":
+                    loc = f"{p['country']} / {p['state']}"
+                elif p["is_sudan"]:
+                    loc = f"{p['country']} / {p['plate_class_en']}"
+                else:
+                    loc = p["country"]
+                print(f"    🔖 {p['text']:<12} {flag} {loc:<26} "
                       f"(country {p['country_confidence']*100:.0f}% | "
                       f"serial={p['serial']}  detect {p['detect_confidence']*100:.0f}%)")
         else:
