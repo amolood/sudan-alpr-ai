@@ -515,7 +515,7 @@ before every change.
 Thanks to everyone who has helped improve this project 💚
 
 <a href="https://github.com/amolood/sudan-alpr-ai/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=amolood/sudan-alpr-ai" alt="Contributors" />
+  <img src="https://contrib.rocks/image?repo=amolood/sudan-alpr-ai" />
 </a>
 
 | Contributor | Role |
