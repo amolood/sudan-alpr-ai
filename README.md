@@ -1,10 +1,18 @@
-# Sudan ALPR
+<h1 align="center">🇸🇩 Sudan ALPR</h1>
 
-[![CI](https://github.com/amolood/sudan-alpr-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/amolood/sudan-alpr-ai/actions/workflows/ci.yml)
+<p align="center">
+  <strong>Automatic license-plate recognition for Sudanese plates.</strong><br>
+  Finds the plate, reads the serial, confirms it's Sudanese, and decodes the state (wilaya) — all locally.
+</p>
 
-Reads Sudanese car license plates from real photos. It finds the plate, reads
-the serial, confirms the plate is actually Sudanese, and tells you which state
-(wilaya) it's from.
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue?logo=python&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+  <img alt="Accuracy" src="https://img.shields.io/badge/OCR%20exact--match-82.6%25-success">
+  <img alt="Country" src="https://img.shields.io/badge/country%20detection-100%25-success">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-42%20passing-brightgreen">
+  <img alt="Built with" src="https://img.shields.io/badge/built%20with-FastALPR%20%2B%20ONNX-orange">
+</p>
 
 <p align="center">
   <img src="docs/demo_plate.png" alt="A real Sudanese plate detected and read as 2G479 (Gezira)" width="520">
@@ -12,13 +20,34 @@ the serial, confirms the plate is actually Sudanese, and tells you which state
   <em>A real plate, detected and read: <code>2G479</code> → Sudan / Gezira</em>
 </p>
 
-It's built on [FastALPR](https://github.com/ankandrew/fast-alpr) and runs two
-deep-learning models locally — no cloud, no API keys. I wrote it because the old
-template-matching version I had (`license-plate-recognition-sudan/`) fell apart
-the moment a photo was taken at an angle or from a distance, which is basically
-every real photo.
+It runs two deep-learning models locally on top of
+[FastALPR](https://github.com/ankandrew/fast-alpr) — no cloud, no API keys. I
+wrote it because the old template-matching version I had fell apart the moment a
+photo was taken at an angle or from a distance, which is basically every real
+photo. This one holds up on messy, real-world shots.
 
-This one holds up on messy, real-world shots.
+---
+
+## Contents
+
+- [How it works](#how-it-works) · [Requirements](#requirements) · [Install](#install)
+- [Project layout](#project-layout) · [Running it](#running-it) · [Output](#output)
+- [Country, class & state recognition](#country-class-and-state-recognition)
+- [Accuracy & benchmark](#benchmark) · [Tests](#tests)
+- [Honest caveats](#honest-caveats) · [Training](training/README.md)
+
+---
+
+## At a glance
+
+| | |
+|---|---|
+| **What it reads** | Sudanese plates: serial, country, plate class, state |
+| **Plate classes** | 16 (private, government, police, army, diplomatic, UN, NGO, investment, transit, temporary…) |
+| **OCR exact-match** | **82.6%** (vs 0% for the off-the-shelf model) |
+| **Country detection** | **100%** on the labeled set |
+| **Runs on** | CPU or Apple Silicon (CoreML), fully offline after first run |
+| **Stack** | YOLO-v9 detector + fine-tuned CCT transformer OCR, via ONNX Runtime |
 
 ## How it works
 
@@ -98,10 +127,12 @@ Training details live in [`training/README.md`](training/README.md).
 There are two readers. Use `recognize_trained.py` unless you have a reason not
 to — it's the accurate one.
 
-| Script | OCR | When to reach for it |
+| Script | Input | When to reach for it |
 |---|---|---|
-| `recognize.py` | global model + **manual column split** | no trained model needed; leans on the known plate layout |
-| `recognize_trained.py` | **fine-tuned** `models/sudan_ocr.onnx` | most accurate; reads the Latin line directly |
+| `recognize_trained.py` | images | **recommended** — fine-tuned OCR, reads the Latin line directly |
+| `recognize.py` | images | no trained model needed; leans on the known plate layout |
+| `recognize_video.py` | video / camera | read plates from a clip or live webcam |
+| `webapp.py` | browser | drag-and-drop web demo |
 
 ```bash
 # the fine-tuned reader (recommended)
@@ -115,6 +146,28 @@ to — it's the accurate one.
 ```
 
 Drop your photos in `input/`, point the script at it, done.
+
+### Video & live camera
+
+```bash
+./venv/bin/python recognize_video.py clip.mp4            # a video file
+./venv/bin/python recognize_video.py 0                   # the default webcam
+./venv/bin/python recognize_video.py clip.mp4 --save out.mp4 --every 5
+```
+
+It runs detection on every Nth frame and de-duplicates, so a plate passing
+through is reported once with a frame-count tally — not once per frame. Press
+`q` in the preview window to stop.
+
+### Web demo
+
+```bash
+./venv/bin/pip install flask     # one time
+./venv/bin/python webapp.py      # then open http://127.0.0.1:5000
+```
+
+A single-page app: drop a car photo and see the boxed plate with its reading,
+country, class, and state. Same pipeline as the CLI.
 
 ## Output
 
@@ -398,6 +451,22 @@ These numbers are reproducible — run the command and you'll get the same thing
 - A **low CER with a lower exact-match** means the model is *close* — usually
   one character off, not lost. That's the healthy kind of wrong: more training
   data closes it.
+
+## Tests
+
+The interpreter (`sudan_plate.py`) is covered by a unit-test suite that locks in
+every behaviour: country detection, all 16 plate classes (Latin *and* Arabic
+markers), state decoding, the collision guards (e.g. `1CDR500` must stay private,
+not diplomatic), Latin folding (`TRANŞIT`), OCR tolerance, and the honesty rules
+around unconfirmed state codes.
+
+```bash
+./venv/bin/python -m pytest -q          # 42 tests, runs in well under a second
+```
+
+The interpreter is pure Python, so the tests need nothing but `pytest` — no
+models, no GPU. They run in a fraction of a second, so it's easy to run them
+before every change.
 
 ## Honest caveats
 
