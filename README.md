@@ -143,8 +143,17 @@ Once the text is read, it passes through the Sudanese plate interpreter in
 ### Plate classes
 
 Sudan doesn't issue one plate format — the General Directorate of Traffic uses
-a whole family, told apart by colour and a text marker. The interpreter knows
-all of them:
+a whole family, told apart by colour and a text marker. Here's the official
+reference board from the Directorate, which is what these classes are modeled
+on:
+
+<p align="center">
+  <img src="docs/plate_types_reference.png" alt="Sudan General Directorate of Traffic — official plate types reference board" width="420">
+  <br>
+  <em>Official Sudanese plate types — General Directorate of Traffic</em>
+</p>
+
+The interpreter knows all of them:
 
 | Class | Marker | Typical colour | Arabic |
 |---|---|---|---|
