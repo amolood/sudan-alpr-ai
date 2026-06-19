@@ -8,3 +8,7 @@ pillow
 
 # Optional: only needed to regenerate the benchmark chart (make_chart.py).
 matplotlib
+
+# Optional: dev/testing.
+pytest
+flask

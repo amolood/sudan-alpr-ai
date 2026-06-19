@@ -1,5 +1,7 @@
 # Sudan ALPR
 
+[![CI](https://github.com/amolood/sudan-alpr-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/amolood/sudan-alpr-ai/actions/workflows/ci.yml)
+
 Reads Sudanese car license plates from real photos. It finds the plate, reads
 the serial, confirms the plate is actually Sudanese, and tells you which state
 (wilaya) it's from.
@@ -63,9 +65,12 @@ python3.11 -m venv venv
 sudan-alpr-ai/
 ├── recognize.py            reader: global OCR + manual column splitting
 ├── recognize_trained.py    reader: the fine-tuned model (most accurate)
-├── sudan_plate.py          interpreter: is-it-Sudanese? + state recognition
+├── recognize_video.py      reader: video files / live camera, frame by frame
+├── sudan_plate.py          interpreter: is-it-Sudanese? + class + state
 ├── benchmark.py            measures accuracy and compares the models
 ├── make_chart.py           renders the benchmark chart in docs/
+├── test_sudan_plate.py     unit tests for the interpreter (pytest)
+├── webapp.py               drag-and-drop web demo (Flask)
 ├── requirements.txt
 ├── models/
 │   ├── sudan_ocr.onnx      OCR model fine-tuned on Sudanese plates
