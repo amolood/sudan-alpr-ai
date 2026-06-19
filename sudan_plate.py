@@ -50,6 +50,7 @@ list). We verify everything from the structure itself.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, asdict
 
 
@@ -194,9 +195,38 @@ class PlateInfo:
         return asdict(self)
 
 
+# Decorated Latin letters that appear on real Sudanese plates / OCR output and
+# must fold to a plain ASCII letter. The board's "TRANŞIT" uses Ş (S-cedilla);
+# OCR engines also emit Ç, İ, etc. unicodedata handles the accented cases; this
+# map covers the few that don't decompose to ASCII.
+_LATIN_FOLD = str.maketrans({
+    "Ş": "S", "Ș": "S", "ß": "S",
+    "Ç": "C", "Ć": "C",
+    "İ": "I", "I": "I",
+    "Ğ": "G",
+    "Ö": "O", "Ø": "O",
+    "Ü": "U",
+})
+
+
 def _normalize(text: str) -> str:
-    """Uppercase, keep alphanumerics only (drops spaces/dots the OCR emits)."""
-    return "".join(c for c in (text or "").upper() if c.isalnum())
+    """Uppercase, fold decorated Latin letters to ASCII, keep alphanumerics only.
+
+    Folding matters because the board prints "TRANŞIT" with a Ş, and OCR may
+    emit other accented forms — without folding, the marker wouldn't match.
+    Arabic characters are left intact (they're matched separately as raw text).
+    """
+    up = (text or "").upper().translate(_LATIN_FOLD)
+    # Strip combining accents from anything that decomposes (É -> E, etc.) while
+    # leaving non-decomposable scripts (Arabic) untouched.
+    decomposed = unicodedata.normalize("NFKD", up)
+    out = []
+    for c in decomposed:
+        if unicodedata.combining(c):
+            continue
+        if c.isalnum():
+            out.append(c)
+    return "".join(out)
 
 
 def _match_class(norm: str, raw: str) -> tuple[PlateClass, str] | None:
