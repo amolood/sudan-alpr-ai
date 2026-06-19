@@ -4,6 +4,12 @@ Reads Sudanese car license plates from real photos. It finds the plate, reads
 the serial, confirms the plate is actually Sudanese, and tells you which state
 (wilaya) it's from.
 
+<p align="center">
+  <img src="docs/demo_plate.png" alt="A real Sudanese plate detected and read as 2G479 (Gezira)" width="520">
+  <br>
+  <em>A real plate, detected and read: <code>2G479</code> → Sudan / Gezira</em>
+</p>
+
 It's built on [FastALPR](https://github.com/ankandrew/fast-alpr) and runs two
 deep-learning models locally — no cloud, no API keys. I wrote it because the old
 template-matching version I had (`license-plate-recognition-sudan/`) fell apart
@@ -59,6 +65,7 @@ sudan-alpr-ai/
 ├── recognize_trained.py    reader: the fine-tuned model (most accurate)
 ├── sudan_plate.py          interpreter: is-it-Sudanese? + state recognition
 ├── benchmark.py            measures accuracy and compares the models
+├── make_chart.py           renders the benchmark chart in docs/
 ├── requirements.txt
 ├── models/
 │   ├── sudan_ocr.onnx      OCR model fine-tuned on Sudanese plates
@@ -276,12 +283,20 @@ against **hand-labeled ground truth** (`training/dataset/labels.csv`).
 
 ### The numbers
 
+<p align="center">
+  <img src="docs/benchmark.png" alt="Benchmark chart: exact-match accuracy and character error rate, global vs fine-tuned" width="720">
+</p>
+
 Across **all 121 labeled plates:**
 
 | Model | Exact-match | Accuracy | CER | ms/plate | plates/s |
 |---|---|---|---|---|---|
 | global (baseline) | 0/121 | **0.0%** | 78.3% | ~7.1 | ~140 |
 | **sudan (fine-tuned)** | 100/121 | **82.6%** | **7.9%** | ~6.0 | ~167 |
+
+The chart above is generated from the benchmark output — run
+`./venv/bin/python make_chart.py` to regenerate it from
+`output/benchmark.json`.
 
 On the **held-out validation set (19 plates the model never saw):**
 
