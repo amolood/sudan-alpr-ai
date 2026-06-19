@@ -1,0 +1,46 @@
+# Python virtual environment (huge — never commit)
+venv/
+.venv/
+env/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Bulk image data: keep only a handful of sample inputs (see !input/web_000*.png).
+# Drop everything else under input/.
+input/*
+!input/web_0001.png
+!input/web_0002.png
+!input/web_0003.png
+!input/web_0004.png
+!input/web_0005.png
+!input/web_0006.png
+!input/web_0007.png
+!input/web_0008.png
+!input/web_0009.png
+!input/web_0010.png
+
+# Generated outputs (annotated images, results.json) — regenerated on run.
+output/
+
+# Bulk training images — keep the label/split CSVs, drop the image folders.
+training/dataset/all_plates/
+training/dataset/good_plates/
+training/dataset/plates/
+training/dataset/web_plates/
+training/dataset/web_raw/
+training/dataset/uploads/
+training/dataset/fetch.log
+
+# Training run artifacts (model checkpoints, logs) — large and regenerable.
+training/output/
+training/web/server.log
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/

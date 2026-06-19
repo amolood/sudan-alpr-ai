@@ -1,0 +1,7 @@
+# Sudan ALPR (AI) — dependencies
+# Install with:  pip install -r requirements.txt
+#
+# NOTE: requires Python 3.11 or 3.12 (onnxruntime has no 3.14 wheel yet).
+fast-alpr[onnx]
+opencv-python
+pillow

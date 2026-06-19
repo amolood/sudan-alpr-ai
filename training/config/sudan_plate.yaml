@@ -1,0 +1,21 @@
+# Plate OCR config for Sudanese plates (Latin serial line: D + LL + DDDD…)
+# Used by `fast-plate-ocr train` and at inference time.
+
+# Max characters in a plate string. "13KH77079" = 9. We use 10 to match the
+# pretrained global model's head count, leaving room for longer plates.
+max_plate_slots: 10
+
+# Every character the model can output. Sudanese Latin serials use digits and
+# the state letters; we include full A-Z so any state code works, plus the pad.
+alphabet: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_'
+
+# Padding char used to fill unused slots (must be in the alphabet).
+pad_char: '_'
+
+# Input size fed to the model. 64x128 matches the pretrained global models, so
+# fine-tuning from them works cleanly.
+img_height: 64
+img_width: 128
+keep_aspect_ratio: false
+interpolation: linear
+image_color_mode: rgb
