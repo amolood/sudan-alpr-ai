@@ -143,6 +143,8 @@ def main() -> int:
     import cv2
     from fast_alpr import ALPR
 
+    from sudan_plate import interpret
+
     print("Loading models (first run downloads weights)…")
     alpr = ALPR(detector_model=args.detector, ocr_model=args.ocr)
     os.makedirs(args.out, exist_ok=True)
@@ -172,17 +174,26 @@ def main() -> int:
             # Stage 2: read using the Sudanese two-column layout.
             text, info = read_sudan_plate(plate_bgr, alpr.ocr, cv2)
 
+            # Stage 3: verify country + recognise the state (wilaya) from text.
+            plate = interpret(text)
+
             plates.append({
-                "text": text,
-                "state": info["state"],
-                "serial": info["serial"],
+                "text": plate.text,
+                "country": plate.country,
+                "country_confidence": plate.country_confidence,
+                "is_sudan": plate.is_sudan,
+                "state": plate.state,
+                "state_code": plate.state_code,
+                "serial": plate.serial or info["serial"],
                 "detect_confidence": round(float(det.confidence), 3),
                 "box": [x1, y1, x2, y2],
             })
 
-            # draw box + recognised text
+            # draw box + recognised text (with country/state when Sudanese)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 0), 2)
             label = text if text else "?"
+            if plate.is_sudan:
+                label = f"{label}  {plate.state_code}/Sudan"
             cv2.putText(annotated, label, (x1, max(0, y1 - 8)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
 
@@ -194,9 +205,11 @@ def main() -> int:
         print(f"\n📷 {os.path.basename(img_path)}")
         if plates:
             for p in plates:
-                print(f"    🔖 {p['text']:<12} "
-                      f"(state={p['state']}  serial={p['serial']}  "
-                      f"detect {p['detect_confidence']*100:.0f}%)")
+                flag = "🇸🇩" if p["is_sudan"] else "🌐"
+                loc = p["country"] + (f" / {p['state']}" if p["is_sudan"] else "")
+                print(f"    🔖 {p['text']:<12} {flag} {loc:<22} "
+                      f"(country {p['country_confidence']*100:.0f}% | "
+                      f"serial={p['serial']}  detect {p['detect_confidence']*100:.0f}%)")
         else:
             print("    — no plate detected above the confidence threshold")
 

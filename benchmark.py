@@ -191,6 +191,69 @@ def evaluate(name: str, items: list[tuple[str, str]], show_errors: bool):
     }
 
 
+def evaluate_country(name: str, items: list[tuple[str, str]], show_errors: bool):
+    """Measure country/state recognition end-to-end.
+
+    For each plate we run the OCR model, feed its text to the Sudan interpreter,
+    and check that it (a) flags the plate as Sudanese and (b) names the right
+    state. Ground truth here: every plate in our dataset *is* Sudanese, and its
+    state is the letters in labels.csv — so this measures the recall of the
+    country+state recogniser on real (imperfect) OCR output.
+    """
+    from sudan_plate import interpret, CODE_ALIASES
+
+    rec = build_recognizer(name)
+
+    def gt_state(gt: str) -> str:
+        """Pull the state code out of a clean ground-truth string like 7KH10346."""
+        letters = "".join(c for c in gt if c.isalpha())
+        return CODE_ALIASES.get(letters, letters)
+
+    sudan_ok = state_ok = total = 0
+    errors: list[dict] = []
+    rec.run_one(items[0][0])  # warm up
+    for path, gt in items:
+        pred_text = rec.run_one(path).plate
+        info = interpret(pred_text)
+        total += 1
+        if info.is_sudan:
+            sudan_ok += 1
+        if info.is_sudan and info.state_code == gt_state(gt):
+            state_ok += 1
+        elif show_errors:
+            errors.append({"image": os.path.basename(path), "gt": gt,
+                           "got_country": info.country, "got_state": info.state_code})
+    return {
+        "model": name,
+        "plates": total,
+        "sudan_recognized": sudan_ok,
+        "sudan_accuracy": sudan_ok / total if total else 0.0,
+        "state_correct": state_ok,
+        "state_accuracy": state_ok / total if total else 0.0,
+        "errors": errors,
+    }
+
+
+def print_country_report(results: list[dict], split: str):
+    n = results[0]["plates"] if results else 0
+    print(f"\nSudan ALPR — country + state recognition   (split={split}, {n} plates)\n")
+    header = f"{'model':<8} {'is-Sudan':>14} {'sudan-acc':>10} {'state-correct':>14} {'state-acc':>10}"
+    print(header)
+    print("-" * len(header))
+    for r in results:
+        print(f"{r['model']:<8} "
+              f"{r['sudan_recognized']:>5}/{r['plates']:<5}    "
+              f"{r['sudan_accuracy']*100:>7.1f}%   "
+              f"{r['state_correct']:>5}/{r['plates']:<5}    "
+              f"{r['state_accuracy']*100:>7.1f}%")
+    for r in results:
+        if r["errors"]:
+            print(f"\n--- {r['model']} country/state misses ({len(r['errors'])}) ---")
+            for e in r["errors"]:
+                print(f"  {e['image']:<28} gt {e['gt']:<10} "
+                      f"-> {e['got_country']}/{e['got_state'] or '-'}")
+
+
 def print_report(results: list[dict], split: str):
     n = results[0]["plates"] if results else 0
     print(f"\nSudan ALPR — OCR benchmark   (split={split}, {n} plates)\n")
@@ -228,6 +291,9 @@ def main() -> int:
     ap.add_argument("--models", nargs="+", default=["global", "sudan"],
                     choices=["global", "sudan"],
                     help="which OCR models to benchmark")
+    ap.add_argument("--country", action="store_true",
+                    help="benchmark country (is-Sudan) + state recognition "
+                         "instead of raw OCR text accuracy")
     ap.add_argument("--show-errors", action="store_true",
                     help="list every misread plate")
     ap.add_argument("--json", metavar="FILE",
@@ -244,9 +310,15 @@ def main() -> int:
     results = []
     for name in args.models:
         print(f"Running '{name}' …", flush=True)
-        results.append(evaluate(name, items, args.show_errors))
+        if args.country:
+            results.append(evaluate_country(name, items, args.show_errors))
+        else:
+            results.append(evaluate(name, items, args.show_errors))
 
-    print_report(results, args.split)
+    if args.country:
+        print_country_report(results, args.split)
+    else:
+        print_report(results, args.split)
 
     if args.json:
         # Drop the verbose error lists from the saved summary unless requested.

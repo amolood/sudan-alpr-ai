@@ -48,6 +48,8 @@ def main() -> int:
     import cv2
     from fast_alpr import ALPR
 
+    from sudan_plate import interpret
+
     # Detector from the hub; OCR is OUR fine-tuned Sudanese model.
     alpr = ALPR(
         detector_model="yolo-v9-t-384-license-plate-end2end",
@@ -68,13 +70,22 @@ def main() -> int:
         plates = []
         for r in drawn.results:
             text = r.ocr.text if r.ocr else ""
-            plates.append({"text": text,
+            info = interpret(text)
+            plates.append({"text": info.text,
+                           "country": info.country,
+                           "country_confidence": info.country_confidence,
+                           "state": info.state,
+                           "state_code": info.state_code,
+                           "is_sudan": info.is_sudan,
                            "detect_conf": round(float(r.detection.confidence), 3)})
         results.append({"image": img_path, "plates": plates})
 
         print(f"\n📷 {os.path.basename(img_path)}")
         for p in plates:
-            print(f"    🔖 {p['text']:<12} (detect {p['detect_conf']*100:.0f}%)")
+            flag = "🇸🇩" if p["is_sudan"] else "🌐"
+            loc = f"{p['country']}" + (f" / {p['state']}" if p["is_sudan"] else "")
+            print(f"    🔖 {p['text']:<12} {flag} {loc:<22} "
+                  f"(country {p['country_confidence']*100:.0f}% | detect {p['detect_conf']*100:.0f}%)")
         if not plates:
             print("    — no plate detected")
 
