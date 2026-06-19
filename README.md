@@ -171,13 +171,17 @@ entry transcribed straight off the board, plate by plate:
 | International Org. | `I.O` | منظمة دولية | white |
 | Sudanese Red Crescent | — | الهلال الأحمر | white |
 | Limousine | — | ليموزين | silver |
+| Investment / Commercial | — | استثمار | green / black |
 | Transit | `TRANSIT` | عبور | silver |
 | Temporary | — | مؤقتة | white |
 | Temporary (Express) | — | مؤقتة سريع | white |
+| Temporary (Domestic) | — | مؤقتة داخلي | white |
 
-Several plates (Red Crescent, Limousine, Temporary) carry **only an Arabic
-word** — no Latin code — so the interpreter matches Arabic markers too, not just
-Latin ones.
+Several plates (Red Crescent, Limousine, Investment, Temporary) carry **only an
+Arabic word** — no Latin code — so the interpreter matches Arabic markers too,
+not just Latin ones. Investment plates also carry a state code (e.g. `KH9`,
+`RS`), which still gets decoded to a wilaya; they're told apart from ordinary
+state plates by their green/black colour and the word **استثمار**.
 
 The **text marker decides the class** — so it still works on a greyscale or
 badly-lit photo. If the caller also measures the plate's **colour** (the

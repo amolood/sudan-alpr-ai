@@ -132,10 +132,19 @@ PLATE_CLASSES: tuple[PlateClass, ...] = (
                ("REDCRESCENT", "HILAL"), ("الهلال الأحمر",), ("white", "red")),
     PlateClass("limousine", "Limousine", "ليموزين",
                (), ("ليموزين",), ("silver",)),
+    # Investment/commercial plates carry a state code (KH9, RS…) AND the word
+    # "استثمار". They're green or black, which is how they differ from a normal
+    # private/state plate that shares the same letters.
+    PlateClass("investment", "Investment / Commercial", "استثمار",
+               (), ("استثمار",), ("green", "black")),
     PlateClass("transit", "Transit", "عبور",
                ("TRANSIT",), ("عبور",), ("silver",)),
+    # Temporary comes in three board variants. List the qualified ones before
+    # the plain "مؤقتة" so "مؤقتة سريع"/"مؤقتة داخلي" win the match.
     PlateClass("temporary_express", "Temporary (Express)", "مؤقتة سريع",
                ("MWQTASR",), ("مؤقتة سريع",), ("white",)),
+    PlateClass("temporary_domestic", "Temporary (Domestic)", "مؤقتة داخلي",
+               ("MWQTADKL",), ("مؤقتة داخلي",), ("white",)),
     PlateClass("temporary", "Temporary", "مؤقتة",
                ("TEMP", "MWQTA"), ("مؤقتة",), ("white",)),
 )
@@ -146,9 +155,11 @@ COLOR_HINTS: dict[str, tuple[str, ...]] = {
     "red":    ("army", "diplomat", "un", "red_crescent"),
     "blue":   ("un", "police"),
     "yellow": ("government", "ngo"),
-    "green":  ("consular",),
+    "green":  ("consular", "investment"),
+    "black":  ("investment",),
     "silver": ("private", "limousine", "transit", "temporary"),
-    "white":  ("private", "int_org", "temporary", "temporary_express", "red_crescent"),
+    "white":  ("private", "int_org", "temporary", "temporary_express",
+               "temporary_domestic", "red_crescent"),
 }
 
 # ---------------------------------------------------------------------------
@@ -217,6 +228,20 @@ def _match_class(norm: str, raw: str) -> tuple[PlateClass, str] | None:
     return None
 
 
+def _extract_state(norm: str) -> tuple[str, str, str]:
+    """Pull a known state code out of mixed text, if one is present.
+
+    Used for special plates (e.g. investment) that carry both a class marker and
+    a state code. Returns (code, english, arabic) or ("", "", "").
+    """
+    for run in re.findall(r"[A-Z]+", norm):
+        code = CODE_ALIASES.get(run, run)
+        if code in STATE_CODES:
+            en, ar = STATE_CODES[code]
+            return code, en, ar
+    return "", "", ""
+
+
 def interpret(text: str,
               header_has_sudan: bool | None = None,
               color: str | None = None) -> PlateInfo:
@@ -247,12 +272,18 @@ def interpret(text: str,
         if color and color in special.colors:
             conf = min(conf + 0.07, 0.99)
             reason.append(f"colour '{color}' matches a {special.name_en} plate")
+        # Some special plates (investment, limousine, transit, temporary) also
+        # carry a state code in their serial — decode it when present so the
+        # output still names the wilaya.
+        sc, s_en, s_ar = _extract_state(norm)
+        if sc:
+            reason.append(f"state code '{sc}' -> {s_en}")
         return PlateInfo(
             text=norm, is_sudan=True, country="Sudan",
             country_confidence=round(conf, 2),
             plate_class=special.key, plate_class_en=special.name_en,
             plate_class_ar=special.name_ar,
-            state_code="", state="—", state_ar="—",
+            state_code=sc, state=s_en or "—", state_ar=s_ar or "—",
             registration_digit="", serial="".join(c for c in norm if c.isdigit()),
             color=color, reason="; ".join(reason),
         )
@@ -343,7 +374,10 @@ def _demo() -> None:
         # Arabic-only markers (these plates carry no Latin code on the board):
         ("الهلال الأحمر 1234", "white"),
         ("ليموزين KH 0000", "silver"),
+        ("استثمار KH9 0000", "green"),   # investment + state decoded
+        ("استثمار RS 0000", "green"),
         ("مؤقتة سريع KH", "white"),
+        ("مؤقتة داخلي KH", "white"),
         ("مؤقتة KH 0000", "white"),
         ("TRANSIT NS 00", "silver"),
         ("ABC", None),
