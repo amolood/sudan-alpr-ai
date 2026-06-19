@@ -159,16 +159,17 @@ The interpreter knows all of them:
 |---|---|---|---|
 | Private | `<digit><state><serial>` | silver / white | خصوصي |
 | Government | `GOV` | yellow | حكومي |
-| Police | `POLICE` | red / blue | الشرطة |
 | Armed Forces | `ARMY` | red | القوات المسلحة |
-| Diplomatic | `CD` | red | دبلوماسي |
-| United Nations | `UN` | blue | الأمم المتحدة |
-| NGO | `NGO` | yellow | منظمة طوعية |
-| High Committee | `HC` | green | اللجنة العليا |
-| Limousine / Taxi | `LIMO` / `TAXI` | yellow | ليموزين / أجرة |
+| Police | `POLICE` | blue / white | الشرطة |
+| United Nations | `UN` | blue / red | الأمم المتحدة |
+| Diplomatic Corps | `CD` | red | السلك الدبلوماسي |
+| Consular Corps | `HC` | green | السلك القنصلي |
+| National NGO | `NGO` | yellow | منظمة وطنية |
+| International Org. | `IO` | white | منظمة دولية |
+| Sudanese Red Crescent | `HILAL` | white / red | الهلال الأحمر السوداني |
 | Transit | `TRANSIT` | silver | عبور |
 | Temporary | `TEMP` | silver | مؤقتة |
-| Red Crescent | `HILAL` | red | الهلال الأحمر |
+| Temporary (Express) | `MWQTASR` | silver | مؤقتة سريع |
 
 The **text marker decides the class** — so it still works on a greyscale or
 badly-lit photo. If the caller also measures the plate's **colour** (the
