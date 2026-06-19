@@ -1,42 +1,49 @@
-# التعرّف الاحترافي على لوحات السودان بالذكاء الاصطناعي (Sudan ALPR – AI)
+# Sudan ALPR
 
-نظام قراءة لوحات سيارات يعمل بموديلات **تعلّم عميق** (Deep Learning) عبر مكتبة
-[FastALPR](https://github.com/ankandrew/fast-alpr) — أدقّ بكثير من طريقة مطابقة
-القوالب في النسخة السابقة (`license-plate-recognition-sudan/`).
+Reads Sudanese car license plates from real photos. It finds the plate, reads
+the serial, confirms the plate is actually Sudanese, and tells you which state
+(wilaya) it's from.
 
-يعمل على **صور السيارات الحقيقية** المائلة والبعيدة، وليس فقط الصور النظيفة.
+It's built on [FastALPR](https://github.com/ankandrew/fast-alpr) and runs two
+deep-learning models locally — no cloud, no API keys. I wrote it because the old
+template-matching version I had (`license-plate-recognition-sudan/`) fell apart
+the moment a photo was taken at an angle or from a distance, which is basically
+every real photo.
 
----
+This one holds up on messy, real-world shots.
 
-## كيف يعمل؟ (مرحلتان مثل أي نظام ANPR احترافي)
+## How it works
+
+It's a two-stage pipeline, same idea every serious ANPR system uses:
 
 ```
-صورة السيارة
+car photo
    │
    ▼
-[1] كشف اللوحة   →  موديل YOLO-v9 يجد مكان اللوحة ويقصّها
+[1] detect   →  a YOLO-v9 model locates the plate and crops it out
    │
    ▼
-[2] قراءة النص   →  موديل OCR (CCT transformer) يحوّلها إلى:  3KH3476
+[2] read     →  a CCT transformer OCR model turns the crop into text → 3KH3476
+   │
+   ▼
+[3] interpret →  confirm it's Sudanese + decode the state → Sudan / Khartoum
 ```
 
-- الموديلان يعملان **محلياً** على جهازك عبر ONNX Runtime.
-- على أجهزة آبل (Apple Silicon) يُستخدم **CoreML** للتسريع تلقائياً.
-- موديل القراءة **عالمي (65+ دولة)** فيقرأ السطر اللاتيني للوحة السودان
-  (مثل `3KH 3476`) بدقة عالية حتى مع الزوايا والإضاءة الصعبة.
+Both models run on your machine through ONNX Runtime. On Apple Silicon they use
+CoreML automatically, so it's quick. The OCR model is fine-tuned on real
+Sudanese plates, so it reads the Latin serial line (e.g. `3KH 3476`) even when
+the lighting is bad or the plate is tilted.
 
----
+## Requirements
 
-## المتطلّبات
+- **Python 3.11 or 3.12.** Not 3.14 — onnxruntime doesn't ship a wheel for it
+  yet, and you'll just hit an install error.
+- Internet on the first run only, to pull the model weights (~11 MB). After
+  that it works offline.
 
-- **Python 3.11 أو 3.12** (مهم: لا تستخدم 3.14 — لا توجد له حزمة onnxruntime بعد).
-- اتصال إنترنت أول مرّة فقط (لتنزيل أوزان الموديلات ~11 ميجابايت).
+## Install
 
----
-
-## التثبيت
-
-تم تجهيز بيئة جاهزة في مجلد `venv/`. إن أردت إعادة التثبيت من الصفر:
+A ready-to-go `venv/` is included. If you'd rather build it yourself:
 
 ```bash
 cd sudan-alpr-ai
@@ -44,282 +51,285 @@ python3.11 -m venv venv
 ./venv/bin/pip install -r requirements.txt
 ```
 
----
-
-## بنية المشروع
+## Project layout
 
 ```
 sudan-alpr-ai/
-├── recognize.py            ← قارئ: الموديل العالمي + تقسيم الأعمدة اليدوي
-├── recognize_trained.py    ← قارئ: الموديل المُحسَّن (الأدقّ)
-├── sudan_plate.py          ← مُفسِّر اللوحة: تأكيد سودانية + التعرّف على الولاية
-├── benchmark.py            ← قياس الدقّة ومقارنة الموديلات (تعليمي)
-├── requirements.txt        ← الاعتماديات
+├── recognize.py            reader: global OCR + manual column splitting
+├── recognize_trained.py    reader: the fine-tuned model (most accurate)
+├── sudan_plate.py          interpreter: is-it-Sudanese? + state recognition
+├── benchmark.py            measures accuracy and compares the models
+├── requirements.txt
 ├── models/
-│   ├── sudan_ocr.onnx      ← موديل القراءة المُحسَّن على لوحات السودان
-│   └── sudan_plate.yaml    ← إعداد الموديل (الأبجدية، حجم الإدخال…)
-├── input/                  ← ضع صور سياراتك هنا
-├── output/                 ← الصور الموسومة + results.json + benchmark.json
-└── training/               ← خط أنابيب تدريب موديل OCR على لوحات حقيقية
+│   ├── sudan_ocr.onnx      OCR model fine-tuned on Sudanese plates
+│   └── sudan_plate.yaml    model config (alphabet, input size, …)
+├── input/                  drop your car photos here
+├── output/                 annotated images + results.json + benchmark.json
+└── training/               pipeline for fine-tuning the OCR on real plates
     ├── dataset/
-    │   ├── good_plates/    ← لوحات مقصوصة (مدخلات القياس والتدريب)
-    │   ├── labels.csv      ← الحقيقة الأرضية الموسومة يدوياً (للقياس)
-    │   ├── train.csv       ← تقسيمة التدريب
-    │   └── val.csv         ← تقسيمة التحقّق المحجوزة (held-out)
-    └── scripts/            ← خطوات: قصّ → توسيم → بناء داتاسِت → تدريب
+    │   ├── good_plates/    cropped plates (used by training and benchmarks)
+    │   ├── labels.csv      hand-verified ground truth
+    │   ├── train.csv       training split
+    │   └── val.csv         held-out validation split
+    └── scripts/            crop → label → build dataset → train
 ```
 
-> **تدفّق البيانات:** صور `input/` → الكاشف يقصّ اللوحات → `training/dataset/`
-> → توسيم يدوي في `labels.csv` → تدريب → `models/sudan_ocr.onnx` →
-> `benchmark.py` يقيس الدقّة على `labels.csv`. حلقة مغلقة قابلة للتكرار.
+The data flows in a loop: photos in `input/` get cropped by the detector into
+`training/dataset/`, you label them in `labels.csv`, training produces
+`models/sudan_ocr.onnx`, and `benchmark.py` scores that model back against
+`labels.csv`. Collect more photos, run it again, get a better model.
 
-لتفاصيل التدريب اقرأ [`training/README.md`](training/README.md).
+Training details live in [`training/README.md`](training/README.md).
 
----
+## Running it
 
-## التشغيل
+There are two readers. Use `recognize_trained.py` unless you have a reason not
+to — it's the accurate one.
 
-يوجد سكربتان للقراءة:
-
-| السكربت | موديل القراءة | متى تستخدمه |
+| Script | OCR | When to reach for it |
 |---|---|---|
-| `recognize.py` | الموديل العالمي + **تقسيم الأعمدة اليدوي** | لا يحتاج موديلاً مُدرَّباً؛ يعتمد على تخطيط اللوحة |
-| `recognize_trained.py` | **الموديل المُحسَّن** `models/sudan_ocr.onnx` | الأدقّ — يقرأ السطر اللاتيني مباشرة |
+| `recognize.py` | global model + **manual column split** | no trained model needed; leans on the known plate layout |
+| `recognize_trained.py` | **fine-tuned** `models/sudan_ocr.onnx` | most accurate; reads the Latin line directly |
 
 ```bash
-# (أ) القارئ بتقسيم الأعمدة
-./venv/bin/python recognize.py input/test_plate.png   # صورة واحدة
-./venv/bin/python recognize.py input/                 # مجلد كامل
-./venv/bin/python recognize.py input/ --det-conf 0.5  # تجاهل كشف ثقته < 50%
-
-# (ب) القارئ بالموديل المُحسَّن (موصى به)
+# the fine-tuned reader (recommended)
 ./venv/bin/python recognize_trained.py input/
 ./venv/bin/python recognize_trained.py input/some_car.jpg
+
+# the column-split reader
+./venv/bin/python recognize.py input/test_plate.png   # one image
+./venv/bin/python recognize.py input/                 # a whole folder
+./venv/bin/python recognize.py input/ --det-conf 0.5  # drop weak detections
 ```
 
-ضع صور سياراتك في مجلد `input/` ثم شغّل الأمر.
+Drop your photos in `input/`, point the script at it, done.
 
----
+## Output
 
-## المخرجات
-
-- **في الطرفية:** النص المقروء + **الدولة والولاية** ونِسَب الثقة، مثل:
-  ```
-  📷 my_car.jpg
-      🔖 3KH3476     🇸🇩 Sudan / Khartoum     (country 95% | detect 90%)
-  ```
-- **مجلد `output/`:**
-  - `annotated_<اسم الصورة>` — الصورة مع مربّع حول اللوحة والنص + `KH/Sudan` فوقها.
-  - `results.json` — كل النتائج (النص، الدولة، الولاية، الثقة، الإحداثيات) بصيغة JSON.
-
----
-
-## التعرّف على الدولة والولاية 🇸🇩
-
-بعد قراءة نص اللوحة، يمرّ النص على **مُفسِّر اللوحة السودانية**
-([`sudan_plate.py`](sudan_plate.py)) الذي يُخرِج:
-
-- **الدولة**: هل اللوحة **سودانية**؟ (نعم/لا) + درجة ثقة.
-- **الولاية** (wilaya): فكّ ترميز حرفَي الولاية إلى اسمها بالعربية والإنجليزية.
-
-### كيف نتأكّد أنها سودانية؟ (بالبنية لا بالتخمين)
-
-اللوحة السودانية المدنية لها **تخطيط ثابت معروف**:
+In the terminal you get the plate text plus country, state, and confidence:
 
 ```
-رقم التسجيل ─┐   ┌─ حرفا الولاية   ┌─ الرقم التسلسلي
-            7      KH               10346     →  "7KH10346"
+📷 my_car.jpg
+    🔖 3KH3476     🇸🇩 Sudan / Khartoum     (country 95% | detect 90%)
 ```
 
-فبدل الاعتماد على موديل عالمي يُخمّن الدولة عشوائياً (السودان غير مُدرَج ضمن
-الـ65 دولة، فكان يُرجِع دولاً خاطئة)، نتحقّق من **النمط نفسه**:
-`رقم + حرفا ولاية + أرقام`. هذا النمط خاصّ باللوحة السودانية، فإن طابقه النص
-أكّدنا أنها سودانية — مع **سبب مكتوب** لكل قرار (لا «هلوسة»).
+And in `output/`:
 
-### أكواد الولايات
+- `annotated_<image>` — the original photo with a box drawn around the plate
+  and the reading (plus `KH/Sudan`) written above it.
+- `results.json` — everything in JSON: text, country, state, confidence scores,
+  and the plate's bounding box.
 
-نُفكّ ترميز أكواد الولايات السودانية القياسية، ومنها الموجودة فعلاً في بياناتنا:
+## Country and state recognition
 
-| الكود | الولاية | الكود | الولاية |
+Once the text is read, it passes through the Sudanese plate interpreter in
+[`sudan_plate.py`](sudan_plate.py), which answers two questions:
+
+- **Is this a Sudanese plate?** Yes/no, with a confidence score.
+- **Which state (wilaya)?** It decodes the state letters into a name, in both
+  English and Arabic.
+
+### Why structure, not guessing
+
+A Sudanese civilian plate has a fixed, well-known layout:
+
+```
+registration digit ─┐   ┌─ state letters   ┌─ serial number
+                    7      KH                10346    →  "7KH10346"
+```
+
+The off-the-shelf global model used to *guess* the country, and it guessed
+wrong — Sudan isn't in its 65-country list, so it would return whatever random
+country looked closest. So I don't ask a model. I check the pattern itself:
+digit, then state letters, then digits. That shape is specifically Sudanese.
+If the text matches, the plate is Sudanese, and the interpreter records *why* it
+decided that — no hallucinated answers.
+
+### State codes
+
+It decodes the standard Sudanese state codes. The ones that actually show up in
+the dataset:
+
+| Code | State | Code | State |
 |---|---|---|---|
-| `KH` | الخرطوم | `NS` | نهر النيل |
-| `G` | الجزيرة | `WN` | النيل الأبيض |
-| `NK` | شمال كردفان | `WK` | غرب كردفان |
-| `ND` | الشمالية | `RS` | البحر الأحمر |
-| … | (وبقية الولايات) | | |
+| `KH` | Khartoum | `NS` | River Nile |
+| `G` | Gezira | `WN` | White Nile |
+| `NK` | North Kordofan | `WK` | West Kordofan |
+| `ND` | Northern | `RS` | Red Sea |
+| … | (and the rest) | | |
 
-> **تساهل مع قراءات OCR الناقصة:** لو فقَد الـOCR رقم التسجيل (`KH5404`) أو
-> ضاعفه (`10KH6009`)، يظلّ المُفسِّر يتعرّف عليها كسودانية بثقة أقلّ، بدل رفضها.
+It's also forgiving of bad OCR. If the reader drops the registration digit
+(`KH5404`) or doubles it (`10KH6009`), the interpreter still recognizes the
+plate as Sudanese — just with lower confidence instead of throwing it out.
 
-### النتائج (قياس موضوعي)
+### How well does it do?
 
-شغّل `benchmark.py --country` لقياس التعرّف على الدولة والولاية مقابل الحقيقة
-الأرضية:
+Run the country benchmark and see for yourself:
 
 ```bash
 ./venv/bin/python benchmark.py --country --models sudan
 ```
 
-| الموديل | تُعرَّف كسودانية | دقّة «سودانية» | الولاية صحيحة | دقّة الولاية |
+| Model | Flagged Sudanese | Accuracy | State correct | State accuracy |
 |---|---|---|---|---|
-| **sudan (مُحسَّن)** | 121/121 | **100.0%** | 118/121 | **97.5%** |
+| **sudan (fine-tuned)** | 121/121 | **100.0%** | 118/121 | **97.5%** |
 
-> **100% من اللوحات تُتعرَّف كسودانية**، و **97.5%** تُحدَّد ولايتها بدقّة.
-> الثلاث الباقية كانت تسميات أرضية مبتورة (أرقام بلا حرف ولاية) — لا خطأ منطقياً.
-> هذا هو **الدليل** على أن التعرّف على السودان يعمل فعلاً، لا مجرّد ادّعاء.
+Every single plate got correctly flagged as Sudanese, and 97.5% landed on the
+right state. The three state misses weren't logic errors — they were truncated
+labels (digits with no state letter, nothing to decode). The point is the
+number is measured, not asserted.
 
----
+## How I got the accuracy up
 
-## كيف رفعنا الدقة (مهم)
+I tried two approaches. Both are benchmarked below.
 
-اتّبعنا مسارين لرفع الدقّة، والأرقام النهائية لكليهما تجدها في قسم
-[القياس (Benchmark)](#القياس-benchmark--كيف-نثبت-الأرقام) أدناه:
+### First approach: splitting the columns by hand (`recognize.py`)
 
-### المسار الأول: تقسيم الأعمدة اليدوي (`recognize.py`)
-
-الموديل العالمي وحده كان **يفشل** على لوحات السودان لأنه يقرأ اللوحة كلها مرّة
-واحدة فيخلط السطر العربي الكبير بالسطر اللاتيني الصغير. أوّل حلّ طبّقناه يستغلّ
-**التخطيط المعروف للوحة السودانية**:
+The global model on its own *failed* on Sudanese plates. It tries to read the
+whole plate in one shot, mixes up the big Arabic line with the small Latin one,
+and produces garbage. The first fix exploited the known layout:
 
 ```
 ┌──────────────────────────┐
-│   SUDAN      السودان      │  ← الثلث العلوي (نتجاهله)
-│  ٧ خ         ١٠٣٤٦        │  ← السطر العربي الكبير
-│  7KH         10346        │  ← السطر اللاتيني الصغير ← نقرأ هذا
+│   SUDAN       السودان     │  ← top third (ignored)
+│  ٧ خ          ١٠٣٤٦       │  ← big Arabic line
+│  7KH          10346       │  ← small Latin line ← we read this
 └──────────────────────────┘
-   عمود الحرف    عمود الأرقام
+   letter column  number column
 ```
 
-1. **نقصّ كل عمود على حدة** ونقرأه منفصلاً (الحرف `7KH` يساراً، الأرقام `10346` يميناً).
-2. **نكبّر** كل قصاصة 4× قبل القراءة (الأرقام صغيرة).
-3. **نصحّح الخلط** في عمود الأرقام (`O→0`, `L→1`, `S→5` …) لأنه أرقام فقط.
-4. **احتياطي:** لو فشل التقسيم (لوحة صغيرة جداً/ضبابية) نرجع لقراءة اللوحة كاملة.
+1. **Crop each column separately** and read it on its own — letters (`7KH`) on
+   the left, digits (`10346`) on the right.
+2. **Upscale each crop 4×** before reading, since the digits are tiny.
+3. **Fix common confusions** in the number column (`O→0`, `L→1`, `S→5`…),
+   because it's digits only.
+4. **Fall back** to reading the whole plate if the split fails on a tiny or
+   blurry image.
 
-**مثال على صور حقيقية** (أوّل خمس لوحات اختبرناها يدوياً): ارتفعت من **0/5 → 4/5**:
+On the first five real plates I tested by hand, this took accuracy from
+**0/5 to 4/5**:
 
-| اللوحة | القراءة | النتيجة |
+| Plate | Read | |
 |---|---|---|
 | `1KH 5490` | `1KH5490` | ✅ |
 | `1NS 180` | `1NS180` | ✅ |
 | `2KH 14514` | `2KH14514` | ✅ |
 | `7KH 10346` | `7KH10346` | ✅ |
-| لوحة 76×39 بكسل (بعيدة جداً) | خطأ | ❌ صغيرة جداً |
+| 76×39 px plate (way too far) | wrong | ❌ too small |
 
-### المسار الثاني: تدريب موديل مخصّص (`recognize_trained.py`)
+### Second approach: training a custom model (`recognize_trained.py`)
 
-بدل القواعد اليدوية، أخذنا الموديل العالمي وعملنا له **fine-tuning** على لوحات
-سودانية حقيقية موسومة. النتيجة موديل يقرأ السطر اللاتيني مباشرةً بلا قواعد، ويحقّق
-**~83% دقّة تامّة** مقابل **0%** للموديل العالمي على نفس الصور — راجع الأرقام
-الكاملة في قسم القياس أدناه. خطوات التدريب في [`training/README.md`](training/README.md).
+Instead of hand-written rules, I took the global model and fine-tuned it on
+labeled real Sudanese plates. The result reads the Latin line directly, no
+rules needed, and hits **~83% exact-match** versus **0%** for the global model
+on the same images. Full numbers below; training steps are in
+[`training/README.md`](training/README.md).
 
----
+## Benchmark
 
-## القياس (Benchmark) — كيف نُثبت الأرقام؟
+"It works great" means nothing without a number behind it. So there's a
+benchmark script that scores the models objectively, on the **same images**,
+against **hand-labeled ground truth** (`training/dataset/labels.csv`).
 
-«يعمل بدقة عالية» كلام بلا قيمة ما لم نقِسه. لذلك يوجد **سكربت قياس** يحسب الدقة
-بشكل موضوعي ويقارن الموديلات على **نفس الصور** ومقابل **حقيقة أرضية موسومة يدوياً**
-(`training/dataset/labels.csv`).
+### How the benchmark works
 
-### كيف يعمل القياس؟
+1. It takes the **pre-cropped** plates from `training/dataset/good_plates/`.
+2. It runs each one through the OCR model **only** — the detector is out of the
+   loop — so the numbers reflect *reading* accuracy, not detection, and the
+   comparison is fair (identical inputs for every model).
+3. It compares the model's text to the correct answer, character by character
+   (after normalizing both to letters and digits).
 
-1. نأخذ صور اللوحات **المقصوصة مسبقاً** من `training/dataset/good_plates/`.
-2. نُمرّر كل لوحة على موديل القراءة (OCR) فقط — **بمعزل عن الكاشف** — حتى تعكس
-   الأرقام دقّة *القراءة* لا دقّة الكشف، وتكون المقارنة عادلة على مدخلات متطابقة.
-3. نقارن نص الموديل بالنص الصحيح، حرفاً بحرف (بعد توحيد الصيغة: حروف وأرقام فقط).
+### The metrics
 
-### المقاييس المستخدمة
-
-| المقياس | المعنى | الأفضل |
+| Metric | What it means | Better |
 |---|---|---|
-| **Exact-match** | اللوحة قُرئت **بالكامل** صحيحة (حرف بحرف) | أعلى |
-| **CER** (Character Error Rate) | مسافة التحرير ÷ عدد الأحرف؛ يلتقط «شبه الصحيح» | أقل |
-| **ms/plate** و **plates/s** | السرعة (زمن القراءة لكل لوحة، وعدد اللوحات بالثانية) | أسرع |
+| **Exact-match** | the whole plate is read correctly, character for character | higher |
+| **CER** (character error rate) | edit distance ÷ characters; catches "almost right" | lower |
+| **ms/plate**, **plates/s** | speed | faster |
 
-### الموديلان المُقارَنان
+### What's being compared
 
-- **global** — الموديل العالمي الجاهز `cct-xs-v2-global-model` (65+ دولة). لم يُدرَّب
-  على السودان إطلاقاً → خط الأساس (baseline).
-- **sudan** — موديلنا المُحسَّن `models/sudan_ocr.onnx` المُدرَّب على لوحات سودانية حقيقية.
+- **global** — the stock `cct-xs-v2-global-model` (65+ countries). Never saw a
+  Sudanese plate. This is the baseline.
+- **sudan** — my fine-tuned `models/sudan_ocr.onnx`, trained on real Sudanese
+  plates.
 
-### التشغيل
+### Commands
 
 ```bash
-# كل اللوحات الموسومة، المقارنة بين الموديلين
+# every labeled plate, both models
 ./venv/bin/python benchmark.py
 
-# مجموعة التحقّق المحجوزة فقط (held-out — لم يرها الموديل أثناء التدريب)
+# the held-out validation set only (the model never trained on these)
 ./venv/bin/python benchmark.py --split val
 
-# موديل واحد فقط + عرض كل قراءة خاطئة
+# one model, and print every misread
 ./venv/bin/python benchmark.py --models sudan --show-errors
 
-# قياس التعرّف على الدولة (سودانية؟) + الولاية
+# country (is-it-Sudanese?) + state recognition
 ./venv/bin/python benchmark.py --country --models sudan
 
-# حفظ النتائج بصيغة JSON
+# dump the results to JSON
 ./venv/bin/python benchmark.py --json output/benchmark.json
 ```
 
-### النتائج الفعلية
+### The numbers
 
-على **كل اللوحات الموسومة (121 لوحة):**
+Across **all 121 labeled plates:**
 
-| الموديل | Exact-match | الدقّة | CER | ms/لوحة | لوحة/ثانية |
+| Model | Exact-match | Accuracy | CER | ms/plate | plates/s |
 |---|---|---|---|---|---|
 | global (baseline) | 0/121 | **0.0%** | 78.3% | ~7.1 | ~140 |
-| **sudan (مُحسَّن)** | 100/121 | **82.6%** | **7.9%** | ~6.0 | ~167 |
+| **sudan (fine-tuned)** | 100/121 | **82.6%** | **7.9%** | ~6.0 | ~167 |
 
-على **مجموعة التحقّق المحجوزة (19 لوحة لم يرها الموديل):**
+On the **held-out validation set (19 plates the model never saw):**
 
-| الموديل | Exact-match | الدقّة | CER |
+| Model | Exact-match | Accuracy | CER |
 |---|---|---|---|
-| **sudan (مُحسَّن)** | 16/19 | **84.2%** | **4.5%** |
+| **sudan (fine-tuned)** | 16/19 | **84.2%** | **4.5%** |
 
-> **الخلاصة:** الموديل العالمي يفشل تماماً (0%) لأنه يقرأ اللوحة كاملة فيخلط
-> السطر العربي باللاتيني وينتج خربشة مثل `AAA` أو `41SA1`. الموديل المُحسَّن على
-> لوحات سودانية حقيقية يقفز إلى **~83%** على نفس الصور — وهذا هو الدليل الموضوعي
-> على أن التدريب أفاد فعلاً.
->
-> الأرقام أعلاه قابلة لإعادة الإنتاج: شغّل الأمر بنفسك وستحصل على النتيجة نفسها.
-> (قد تختلف ms/لوحة قليلاً حسب جهازك.)
+The global model scores a flat 0% because it reads the whole plate at once,
+blends the Arabic and Latin lines, and spits out junk like `AAA` or `41SA1`.
+The fine-tuned model jumps to ~83% on the exact same crops. That gap is the
+whole argument for training it.
 
-### قراءة نتائج القياس (تعليمي)
+These numbers are reproducible — run the command and you'll get the same thing
+(ms/plate will wobble a bit depending on your machine).
 
-- **اللوحات التي تفشل** غالباً صغيرة جداً أو حُذِف منها رقم/حرف عند القصّ
-  (مثل `1K91490` يُقرأ `1KH91490` — حرف زائد). استخدم `--show-errors` لرؤيتها.
-- **CER منخفض مع Exact-match أقل** يعني أن الموديل «قريب جداً» (خطأ حرف واحد عادةً)
-  وليس ضائعاً — مؤشّر صحّي على أن مزيداً من بيانات التدريب سيغلق الفجوة.
+### Reading the results
 
----
+- The plates that fail are usually **too small or blurry**, or lost a character
+  when they were cropped (e.g. `1K91490` read as `1KH91490` — one extra
+  character). There's nothing in the pixels to read. Use `--show-errors` to see
+  exactly what failed and why.
+- A **low CER with a lower exact-match** means the model is *close* — usually
+  one character off, not lost. That's the healthy kind of wrong: more training
+  data closes it.
 
-## ملاحظات مهمة (بصراحة)
+## Honest caveats
 
-1. **اللوحات التي تفشل** غالباً صغيرة جداً/ضبابية (مثل 76×39 بكسل) لدرجة أن
-   التفاصيل غير موجودة أصلاً في الصورة، أو فُقد منها حرف عند القصّ. لا يمكن لأي
-   موديل قراءة ما ليس في الصورة؛ الحل هو صورة أقرب/أوضح. شغّل
-   `benchmark.py --show-errors` لرؤية القائمة الكاملة لما يفشل ولماذا.
-2. **الدولة لم تعد تُخمَّن من الموديل العالمي** (الذي كان يُرجِع دولاً خاطئة لأن
-   السودان غير مُدرَج ضمن الـ65 دولة). صار التعرّف على الدولة يتمّ ببنية اللوحة
-   عبر [`sudan_plate.py`](sudan_plate.py) بدقّة **100%** على بياناتنا — راجع قسم
-   [التعرّف على الدولة والولاية](#التعرف-على-الدولة-والولاية-).
+1. **Failures are almost always image quality**, not the model. A 76×39 px
+   plate (tiny and blurry) or a character clipped during cropping — no model
+   can read detail that isn't in the photo. Closer, sharper shots fix it. Run
+   `benchmark.py --show-errors` for the full list of what fails and why.
+2. **The country is no longer guessed by the global model** (which used to
+   return wrong countries because Sudan isn't in its 65-country list). It's now
+   decided from the plate's structure in [`sudan_plate.py`](sudan_plate.py),
+   at **100%** on this dataset — see the country/state section above.
+3. **The Arabic line** (`٣خ ٣٤٧٦`): the OCR is tuned for Latin text, so we read
+   the bottom Latin line, which carries the same information. If you specifically
+   need the Arabic text read accurately, that means fine-tuning an OCR on real
+   Sudanese plates — doable, but it needs a labeled dataset.
+4. **To push accuracy even higher** on Sudanese plates specifically: gather
+   200–500 plate photos, annotate them, and fine-tune both the detector and the
+   OCR on them. The training pipeline here is set up for exactly that.
 
-3. **السطر العربي** (`٣خ ٣٤٧٦`): الموديل العالمي مُحسَّن للنص اللاتيني، لذا نعتمد
-   على السطر اللاتيني السفلي (الذي يحوي نفس المعلومة). إن احتجت قراءة النص العربي
-   نفسه بدقة، فالحل هو **تدريب/ضبط موديل OCR على صور لوحات سودانية حقيقية** — وهذا
-   ممكن لكنه يتطلّب تجميع مجموعة بيانات.
+## Versus the old version
 
-4. **للحصول على أعلى دقة مطلقة على لوحات السودان تحديداً**، يمكن لاحقاً:
-   - تجميع 200–500 صورة لوحة سودانية وتوسيمها (annotation).
-   - عمل fine-tuning لموديل الكشف والقراءة عليها.
-   أقدر أساعدك في إعداد خط أنابيب التدريب إن رغبت.
-
----
-
-## مقارنة بالنسخة القديمة
-
-| | النسخة القديمة (MATLAB / corr2) | هذه النسخة (AI) |
+| | Old version (MATLAB / corr2) | This version (AI) |
 |---|---|---|
-| الطريقة | مطابقة قوالب بكسل | تعلّم عميق (YOLO + Transformer OCR) |
-| صور حقيقية مائلة | تفشل غالباً | تعمل جيداً |
-| الإعداد | يحتاج MATLAB | Python مجاني |
-| الدقة | محدودة | عالية (احترافية) |
+| Method | pixel template matching | deep learning (YOLO + transformer OCR) |
+| Angled real photos | usually failed | handles them fine |
+| Setup | needs MATLAB | free Python |
+| Accuracy | limited | high |
