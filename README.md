@@ -155,21 +155,29 @@ on:
 
 The interpreter knows all of them:
 
-| Class | Marker | Typical colour | Arabic |
+Each class is matched by a Latin marker, an Arabic marker, or both — every
+entry transcribed straight off the board, plate by plate:
+
+| Class | Latin marker | Arabic | Colour |
 |---|---|---|---|
-| Private | `<digit><state><serial>` | silver / white | خصوصي |
-| Government | `GOV` | yellow | حكومي |
-| Armed Forces | `ARMY` | red | القوات المسلحة |
-| Police | `POLICE` | blue / white | الشرطة |
-| United Nations | `UN` | blue / red | الأمم المتحدة |
-| Diplomatic Corps | `CD` | red | السلك الدبلوماسي |
-| Consular Corps | `HC` | green | السلك القنصلي |
-| National NGO | `NGO` | yellow | منظمة وطنية |
-| International Org. | `IO` | white | منظمة دولية |
-| Sudanese Red Crescent | `HILAL` | white / red | الهلال الأحمر السوداني |
-| Transit | `TRANSIT` | silver | عبور |
-| Temporary | `TEMP` | silver | مؤقتة |
-| Temporary (Express) | `MWQTASR` | silver | مؤقتة سريع |
+| Private | `<digit><state><serial>` | خصوصي | silver / white |
+| Government | `GOV` | حكومة | yellow |
+| Armed Forces | `ARMY` | القوات المسلحة | red |
+| Police | `POLICE` | الشرطة | white / blue |
+| United Nations | `U.N` | الأمم المتحدة | red & blue variants |
+| Diplomatic Corps | `C.D` | السلك الدبلوماسي | red |
+| Consular Corps | `H.C` | السلك القنصلي | green |
+| National NGO | `N.G.O` | منظمة وطنية | yellow |
+| International Org. | `I.O` | منظمة دولية | white |
+| Sudanese Red Crescent | — | الهلال الأحمر | white |
+| Limousine | — | ليموزين | silver |
+| Transit | `TRANSIT` | عبور | silver |
+| Temporary | — | مؤقتة | white |
+| Temporary (Express) | — | مؤقتة سريع | white |
+
+Several plates (Red Crescent, Limousine, Temporary) carry **only an Arabic
+word** — no Latin code — so the interpreter matches Arabic markers too, not just
+Latin ones.
 
 The **text marker decides the class** — so it still works on a greyscale or
 badly-lit photo. If the caller also measures the plate's **colour** (the
@@ -177,8 +185,8 @@ column-split reader does, via `dominant_plate_color`), that colour is used as
 *corroboration* and nudges the confidence up, but it's never the sole signal.
 
 So a `POLICE 00000` plate reads as Police, an `ARMY 00000` as Armed Forces, a
-`GOV 00000` as Government — and a normal `7KH10346` stays Private with its state
-decoded to Khartoum.
+`ليموزين` plate as Limousine — and a normal `7KH10346` stays Private with its
+state decoded to Khartoum.
 
 ### Why structure, not guessing
 

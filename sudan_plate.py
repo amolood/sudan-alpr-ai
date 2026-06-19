@@ -95,43 +95,51 @@ CODE_ALIASES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class PlateClass:
-    key: str            # machine id, e.g. "police"
+    key: str                      # machine id, e.g. "police"
     name_en: str
     name_ar: str
-    markers: tuple[str, ...]   # regex fragments to look for in the text
-    colors: tuple[str, ...]    # plate colours this class typically uses
+    markers: tuple[str, ...]      # Latin/numeric fragments to look for
+    markers_ar: tuple[str, ...]   # Arabic fragments (some plates have no Latin)
+    colors: tuple[str, ...]       # plate colours this class typically uses
 
 
-# NOTE: these are taken directly from the Directorate of Traffic reference
-# board (docs/plate_types_reference.png). Markers and Arabic names verified
-# against that board — no invented classes.
+# NOTE: this list mirrors the General Directorate of Traffic reference board
+# (docs/plate_types_reference.png) exactly, transcribed plate-by-plate with no
+# guessing. Each entry's Latin marker, Arabic marker, and colour come straight
+# from the board. Some plates (Red Crescent, Limousine, Temporary) carry only
+# an Arabic word, so they're matched on markers_ar.
+#
+# Order matters: longer/more specific markers are listed before "مؤقتة" so the
+# express variant ("مؤقتة سريع") wins over the plain one.
 PLATE_CLASSES: tuple[PlateClass, ...] = (
-    PlateClass("government", "Government",  "حكومي",
-               ("GOV",), ("yellow",)),
-    PlateClass("army",      "Armed Forces", "القوات المسلحة",
-               ("ARMY",), ("red",)),
-    PlateClass("police",    "Police",      "الشرطة",
-               ("POLICE", "SHRTA"), ("blue", "white")),
-    PlateClass("un",        "United Nations", "الأمم المتحدة",
-               ("UN",), ("blue", "red")),
-    PlateClass("diplomat",  "Diplomatic Corps", "السلك الدبلوماسي",
-               ("CD",), ("red",)),
-    PlateClass("consular",  "Consular Corps", "السلك القنصلي",
-               ("HC",), ("green",)),
-    PlateClass("ngo",       "National NGO", "منظمة وطنية",
-               ("NGO",), ("yellow",)),
-    PlateClass("int_org",   "International Organization", "منظمة دولية",
-               ("IO",), ("white",)),
+    PlateClass("government", "Government", "حكومي",
+               ("GOV",), ("حكومة", "حكومي"), ("yellow",)),
+    PlateClass("army", "Armed Forces", "القوات المسلحة",
+               ("ARMY",), ("القوات المسلحة",), ("red",)),
+    PlateClass("police", "Police", "الشرطة",
+               ("POLICE",), ("الشرطة",), ("white", "blue")),
+    PlateClass("un", "United Nations", "الأمم المتحدة",
+               ("UN",), ("الأمم المتحدة",), ("red", "blue")),
+    PlateClass("diplomat", "Diplomatic Corps", "السلك الدبلوماسي",
+               ("CD",), ("السلك الدبلوماسي",), ("red",)),
+    PlateClass("consular", "Consular Corps", "السلك القنصلي",
+               ("HC",), ("السلك القنصلي",), ("green",)),
+    PlateClass("ngo", "National NGO", "منظمة وطنية",
+               ("NGO",), ("منظمة وطنية",), ("yellow",)),
+    PlateClass("int_org", "International Organization", "منظمة دولية",
+               ("IO",), ("منظمة دولية",), ("white",)),
     PlateClass("red_crescent", "Sudanese Red Crescent", "الهلال الأحمر السوداني",
-               ("REDCRESCENT", "HILAL"), ("red", "white")),
-    PlateClass("transit",   "Transit",     "عبور",
-               ("TRANSIT",), ("silver", "white")),
+               ("REDCRESCENT", "HILAL"), ("الهلال الأحمر",), ("white", "red")),
+    PlateClass("limousine", "Limousine", "ليموزين",
+               (), ("ليموزين",), ("silver",)),
+    PlateClass("transit", "Transit", "عبور",
+               ("TRANSIT",), ("عبور",), ("silver",)),
     PlateClass("temporary_express", "Temporary (Express)", "مؤقتة سريع",
-               ("MWQTASR", "EXPRESS"), ("silver", "white")),
-    PlateClass("temporary", "Temporary",   "مؤقتة",
-               ("TEMP", "MWQTA"), ("silver", "white")),
+               ("MWQTASR",), ("مؤقتة سريع",), ("white",)),
+    PlateClass("temporary", "Temporary", "مؤقتة",
+               ("TEMP", "MWQTA"), ("مؤقتة",), ("white",)),
 )
-PRIVATE = PlateClass("private", "Private", "خصوصي", (), ("silver", "white"))
+PRIVATE = PlateClass("private", "Private", "خصوصي", (), ("خصوصي",), ("silver", "white"))
 
 # Markers a colour *suggests* when the text is ambiguous (corroboration only).
 COLOR_HINTS: dict[str, tuple[str, ...]] = {
@@ -139,8 +147,8 @@ COLOR_HINTS: dict[str, tuple[str, ...]] = {
     "blue":   ("un", "police"),
     "yellow": ("government", "ngo"),
     "green":  ("consular",),
-    "silver": ("private", "transit", "temporary"),
-    "white":  ("private",),
+    "silver": ("private", "limousine", "transit", "temporary"),
+    "white":  ("private", "int_org", "temporary", "temporary_express", "red_crescent"),
 }
 
 # ---------------------------------------------------------------------------
@@ -178,25 +186,34 @@ def _normalize(text: str) -> str:
     return "".join(c for c in (text or "").upper() if c.isalnum())
 
 
-def _match_class(norm: str) -> PlateClass | None:
-    """Return the special plate class whose marker appears in the text, if any.
+def _match_class(norm: str, raw: str) -> tuple[PlateClass, str] | None:
+    """Find the special plate class for this text. Returns (class, matched_marker).
 
-    Short two-letter markers (CD, UN, HC, IO) are risky: a private serial like
-    "1CDR500" or "2UN30" merely *contains* those letters. So a short marker only
-    fires when (a) it stands alone as a letter run (no other letter glued to it)
-    AND (b) the whole text is NOT a valid private plate. Longer, distinctive
-    markers (POLICE, ARMY, GOV, NGO, TRANSIT…) can match anywhere.
+    Matching uses two signals:
+      • Latin markers against `norm` (uppercased, alphanumeric-only).
+      • Arabic markers against `raw` — several plates (Red Crescent, Limousine,
+        Temporary…) carry only an Arabic word, no Latin code.
+
+    Short two-letter Latin markers (CD, UN, HC, IO) are risky: a private serial
+    like "1CDR500" or "2UN30" merely *contains* those letters. So a short marker
+    only fires when it stands alone as a letter run AND the text isn't a valid
+    private plate. Longer markers (POLICE, ARMY, NGO, TRANSIT…) match anywhere.
     """
     looks_private = bool(PLATE_RE.match(norm))
     for pc in PLATE_CLASSES:
+        # Arabic markers first — they're unambiguous and present even when the
+        # OCR caught no Latin text.
+        for ar in pc.markers_ar:
+            if ar and ar in raw:
+                return pc, ar
         for marker in pc.markers:
             if len(marker) <= 2 and marker.isalpha():
                 if looks_private:
                     continue
                 if re.search(rf"(?<![A-Z]){marker}(?![A-Z])", norm):
-                    return pc
+                    return pc, marker
             elif marker in norm:
-                return pc
+                return pc, marker
     return None
 
 
@@ -217,14 +234,16 @@ def interpret(text: str,
         ("red"/"blue"/"yellow"/"green"/"silver"/"white"). Used only to
         corroborate the class and country — the text marker decides the class.
     """
+    raw = (text or "").strip()
     norm = _normalize(text)
     color = (color or "").lower().strip()
 
     # --- 1) Special (non-private) classes are decided by their text marker. ---
-    special = _match_class(norm)
-    if special is not None:
+    matched = _match_class(norm, raw)
+    if matched is not None:
+        special, marker = matched
         conf = 0.9
-        reason = [f"'{'/'.join(special.markers)}' marker -> {special.name_en} plate"]
+        reason = [f"'{marker}' marker -> {special.name_en} plate"]
         if color and color in special.colors:
             conf = min(conf + 0.07, 0.99)
             reason.append(f"colour '{color}' matches a {special.name_en} plate")
@@ -309,28 +328,32 @@ def interpret(text: str,
 
 def _demo() -> None:
     samples = [
-        ("7KH10346", None),     # private
-        ("13KH00000", None),    # private, two-digit registration
-        ("1NS180", None),       # private (River Nile)
-        ("2G479", None),        # private (Gezira)
-        ("1CDR500", None),      # private (Central Darfur) — NOT diplomat
+        ("7KH10346", None),       # private
+        ("13KH00000", None),      # private, two-digit registration
+        ("1NS180", None),         # private (River Nile)
+        ("1CDR500", None),        # private (Central Darfur) — NOT diplomat
         ("GOV00000", "yellow"),
         ("ARMY00000", "red"),
         ("POLICE00000", "blue"),
         ("UN00", "blue"),
-        ("CD12", "red"),        # diplomatic
-        ("HC34", "green"),      # consular corps
+        ("CD12", "red"),          # diplomatic corps
+        ("HC34", "green"),        # consular corps
         ("NGO0000", "yellow"),
-        ("IO0000", "white"),    # international organization
-        ("TRANSITNS00", "silver"),
+        ("IO0000", "white"),      # international organization
+        # Arabic-only markers (these plates carry no Latin code on the board):
+        ("الهلال الأحمر 1234", "white"),
+        ("ليموزين KH 0000", "silver"),
+        ("مؤقتة سريع KH", "white"),
+        ("مؤقتة KH 0000", "white"),
+        ("TRANSIT NS 00", "silver"),
         ("ABC", None),
     ]
     for s, col in samples:
         info = interpret(s, color=col)
         flag = "🇸🇩" if info.is_sudan else "  "
         extra = (f"state={info.state} ({info.state_code})"
-                 if info.plate_class == "private" else "")
-        print(f"{s:<14} {flag} {info.plate_class_en:<16} "
+                 if info.plate_class == "private" else f"({info.plate_class_ar})")
+        print(f"{s:<22} {flag} {info.plate_class_en:<26} "
               f"conf={info.country_confidence:<4} {extra}")
 
 
