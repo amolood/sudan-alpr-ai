@@ -518,11 +518,6 @@ Thanks to everyone who has helped improve this project 💚
   <img src="https://contrib.rocks/image?repo=amolood/sudan-alpr-ai" />
 </a>
 
-| Contributor | Role |
-|---|---|
-| [@amolood](https://github.com/amolood) | Author & maintainer — pipeline, interpreter, benchmark, training |
-| [@mhamidawad](https://github.com/mhamidawad) | Training script hardening — WandB tracking, checkpoint resume, pre-flight checks |
-
 Contributions are welcome — open an issue or a pull request. Good first areas:
 adding verified state codes, gathering labeled plates for training, or reading
 the Arabic line directly.
