@@ -55,31 +55,51 @@ from dataclasses import dataclass, asdict
 
 
 # ---------------------------------------------------------------------------
-# State (wilaya) code -> (English, Arabic).
+# State (wilaya) Latin code -> (English, Arabic name, Arabic plate letter,
+# evidence level).
 #
-# Confirmed in training/dataset/labels.csv and in the Directorate of Traffic
-# reference board: KH, G, NK, WN, WK, NS, RS. The rest are Sudan's standard
-# wilaya plate letters, included so any valid plate resolves to a named state.
+# HONESTY NOTE — this is the important part:
+# The ONLY Latin state code with a clear published source is KH = الخرطوم
+# (Khartoum). Sudan Police publish the plate letters in *Arabic only*; they do
+# NOT publish an official Arabic-letter -> Latin-code mapping or state names.
+#
+# So each entry is tagged with how sure we are:
+#   "confirmed" — has a clear published source (only KH).
+#   "observed"  — the Latin code appears in our own data/photos (good evidence
+#                 it's real) but isn't confirmed against an official source.
+# We do NOT invent codes with no evidence at all. Codes that were previously
+# guessed (SK, ND, KS, GD, SN, BN, SD, WD, ED, CDR…) have been removed — their
+# Arabic plate letters are kept below for reference, but with no Latin code,
+# because guessing a code we can't support would undermine the whole point.
+#
+# The Arabic plate letters come from the official Sudan Police list.
 # ---------------------------------------------------------------------------
-STATE_CODES: dict[str, tuple[str, str]] = {
-    "KH": ("Khartoum", "الخرطوم"),
-    "G":  ("Gezira", "الجزيرة"),
-    "NS": ("River Nile", "نهر النيل"),
-    "NK": ("North Kordofan", "شمال كردفان"),
-    "SK": ("South Kordofan", "جنوب كردفان"),
-    "WK": ("West Kordofan", "غرب كردفان"),
-    "ND": ("Northern", "الشمالية"),
-    "RS": ("Red Sea", "البحر الأحمر"),
-    "KS": ("Kassala", "كسلا"),
-    "GD": ("Gedaref", "القضارف"),
-    "SN": ("Sennar", "سنار"),
-    "WN": ("White Nile", "النيل الأبيض"),
-    "BN": ("Blue Nile", "النيل الأزرق"),
-    "NDR": ("North Darfur", "شمال دارفور"),
-    "SD": ("South Darfur", "جنوب دارفور"),
-    "WD": ("West Darfur", "غرب دارفور"),
-    "ED": ("East Darfur", "شرق دارفور"),
-    "CDR": ("Central Darfur", "وسط دارفور"),
+STATE_CODES: dict[str, tuple[str, str, str, str]] = {
+    # code:  (English,        Arabic state,   Arabic plate letter, evidence)
+    "KH":   ("Khartoum",      "الخرطوم",      "خ",    "confirmed"),
+    "G":    ("Gezira",        "الجزيرة",      "ج",    "observed"),
+    "NS":   ("River Nile",    "نهر النيل",    "ش",    "observed"),
+    "NK":   ("North Kordofan", "شمال كردفان", "ش ك",  "observed"),
+    "WK":   ("West Kordofan", "غرب كردفان",   "غ ك",  "observed"),
+    "WN":   ("White Nile",    "النيل الأبيض", "و د",  "observed"),
+    "RS":   ("Red Sea",       "البحر الأحمر", "ب ح",  "observed"),
+}
+
+# Official Sudan Police plate letters that exist in Arabic but for which we have
+# NO supportable Latin code. Kept for reference/documentation only — they are
+# intentionally NOT used to claim a state from a Latin serial.
+UNMAPPED_ARABIC_LETTERS: dict[str, str] = {
+    "ج ك": "جنوب كردفان",
+    "ش د": "الشمالية",
+    "ك":   "كسلا",
+    "ق د": "القضارف",
+    "س":   "سنار",
+    "ن ب": "النيل الأزرق",
+    "ج د": "دارفور (جنوب/غرب)",
+    "غ د": "غرب دارفور",
+    "ن":   "غير محدّد",
+    "ق":   "غير محدّد",
+    "ن ز": "غير محدّد",
 }
 
 # Common OCR truncations / variants -> canonical state code. "K" alone is
@@ -269,7 +289,7 @@ def _extract_state(norm: str) -> tuple[str, str, str]:
     for run in re.findall(r"[A-Z]+", norm):
         code = CODE_ALIASES.get(run, run)
         if code in STATE_CODES:
-            en, ar = STATE_CODES[code]
+            en, ar = STATE_CODES[code][0], STATE_CODES[code][1]
             return code, en, ar
     return "", "", ""
 
@@ -353,13 +373,17 @@ def interpret(text: str,
     serial = m.group("serial")
     state_code = CODE_ALIASES.get(raw_state, raw_state)
     known = state_code in STATE_CODES
-    state_en, state_ar = STATE_CODES.get(state_code, ("Unknown", "غير معروف"))
+    if known:
+        state_en, state_ar, _letter, evidence = STATE_CODES[state_code]
+    else:
+        state_en, state_ar, evidence = "Unknown", "غير معروف", "none"
 
     conf = 0.85
     reason = ["matches Sudanese private layout (D + LL + DDDD…)"]
     if known:
         conf += 0.10
-        reason.append(f"state code '{state_code}' is a known wilaya")
+        tag = "" if evidence == "confirmed" else " (code observed, not officially confirmed)"
+        reason.append(f"state code '{state_code}' -> {state_en}{tag}")
     else:
         conf -= 0.15
         reason.append(f"state code '{state_code}' not in known list")
@@ -394,7 +418,8 @@ def _demo() -> None:
         ("7KH10346", None),       # private
         ("13KH00000", None),      # private, two-digit registration
         ("1NS180", None),         # private (River Nile)
-        ("1CDR500", None),        # private (Central Darfur) — NOT diplomat
+        ("1RS740", None),         # private, observed-only state code
+        ("1CDR500", None),        # private, NOT diplomat, state now Unknown (un-guessed)
         ("GOV00000", "yellow"),
         ("ARMY00000", "red"),
         ("POLICE00000", "blue"),

@@ -208,22 +208,38 @@ digit, then state letters, then digits. That shape is specifically Sudanese.
 If the text matches, the plate is Sudanese, and the interpreter records *why* it
 decided that — no hallucinated answers.
 
-### State codes
+### State codes — and an honest caveat
 
-It decodes the standard Sudanese state codes. The ones that actually show up in
-the dataset:
+Here's the part most ALPR write-ups quietly skip. Sudan Police publish the plate
+letters **in Arabic only**. There is no official, published table mapping each
+Arabic letter to a Latin code (`KH`, `NK`, …) or to a state name. So I only
+claim what I can actually support:
 
-| Code | State | Code | State |
+| Latin code | State | Arabic letter | Evidence |
 |---|---|---|---|
-| `KH` | Khartoum | `NS` | River Nile |
-| `G` | Gezira | `WN` | White Nile |
-| `NK` | North Kordofan | `WK` | West Kordofan |
-| `ND` | Northern | `RS` | Red Sea |
-| … | (and the rest) | | |
+| `KH` | Khartoum | خ | **confirmed** (published source) |
+| `G` | Gezira | ج | observed in data |
+| `NS` | River Nile | ش | observed in data |
+| `NK` | North Kordofan | ش ك | observed in data |
+| `WK` | West Kordofan | غ ك | observed in data |
+| `WN` | White Nile | و د | observed in data |
+| `RS` | Red Sea | ب ح | observed in data |
 
-It's also forgiving of bad OCR. If the reader drops the registration digit
-(`KH5404`) or doubles it (`10KH6009`), the interpreter still recognizes the
-plate as Sudanese — just with lower confidence instead of throwing it out.
+Only **`KH` is confirmed** against a published source. The rest are codes that
+genuinely appear in our own labeled data and photos — strong evidence they're
+real — but I haven't found an official source that names them, so the
+interpreter tags them *"observed, not officially confirmed"* rather than stating
+them as fact.
+
+Codes I previously **guessed** for the other states (South Kordofan, the Darfur
+states, Kassala, Sennar…) have been **removed**. Their Arabic plate letters are
+kept in the code (`UNMAPPED_ARABIC_LETTERS`) for reference, but with no Latin
+code — inventing one I can't back up would defeat the purpose. If you have an
+authoritative source for those mappings, they're a one-line addition each.
+
+The decoder is also forgiving of bad OCR: if the reader drops the registration
+digit (`KH5404`) or doubles it (`10KH6009`), the plate is still recognized as
+Sudanese — just with lower confidence instead of being thrown out.
 
 ### How well does it do?
 
